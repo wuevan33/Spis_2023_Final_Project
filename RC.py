@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BOARD)
 
-gamepad = InputDevice('/dev/input/event2')
+gamepad = InputDevice('/dev/input/event0')
 print(gamepad)
 print("")
 

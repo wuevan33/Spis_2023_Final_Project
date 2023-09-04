@@ -4,12 +4,15 @@ import picamera
 import picamera.array                           
 import cv2
 import numpy as np
+import time
 
 GPIO.setmode(GPIO.BOARD)
 
 gamepad = InputDevice('/dev/input/event0')
+'''
 print(gamepad)
 print("")
+'''
 
 # set GPIO Pins
 GPIO_Ain1 = 11
@@ -19,6 +22,9 @@ GPIO_Bin1 = 29
 GPIO_Bin2 = 31
 GPIO_Bpwm = 33
 
+GPIO_Servo = 22
+
+
 # Set GPIO direction (IN / OUT)
 GPIO.setup(GPIO_Ain1, GPIO.OUT)
 GPIO.setup(GPIO_Ain2, GPIO.OUT)
@@ -26,6 +32,8 @@ GPIO.setup(GPIO_Apwm, GPIO.OUT)
 GPIO.setup(GPIO_Bin1, GPIO.OUT)
 GPIO.setup(GPIO_Bin2, GPIO.OUT)
 GPIO.setup(GPIO_Bpwm, GPIO.OUT)
+
+GPIO.setup(GPIO_Servo, GPIO.OUT)
 
 # Both motors are stopped 
 GPIO.output(GPIO_Ain1, False)
@@ -35,10 +43,13 @@ GPIO.output(GPIO_Bin2, False)
 
 # Set PWM parameters
 pwm_frequency = 50
+duty_min = 2.5 * float(pwm_frequency) / 50.0
+duty_max = 12.5 * float(pwm_frequency) / 50.0
 
 # Create the PWM instances
 pwmA = GPIO.PWM(GPIO_Apwm, pwm_frequency)
 pwmB = GPIO.PWM(GPIO_Bpwm, pwm_frequency)
+pwm_servo = GPIO.PWM(GPIO_Servo, pwm_frequency)
 
 # Set the duty cycle (between 0 and 100)
 # The duty cycle determines the speed of the wheels
@@ -54,6 +65,74 @@ camera = picamera.PiCamera()
 camera.resolution = (640, 480)
 camera.framerate = 32
 
+#Set GPIO Ultrasound Sensor Pins
+TriggerFront  = 8
+EchoFront    = 10
+
+TriggerBack = 12
+EchoBack = 16
+
+#Set GPIO Ultrasound Sensor Direction (IN/OUT)
+GPIO.setup(TriggerFront, GPIO.OUT)
+GPIO.setup(EchoFront, GPIO.IN)
+
+GPIO.setup(TriggerBack, GPIO.OUT)
+GPIO.setup(EchoBack, GPIO.IN)
+
+# Wait for sensor to settle
+GPIO.output(TriggerFront, False)
+print("Waiting for front sensor to settle")
+GPIO.output(TriggerBack, False)
+print("Waiting for back sensor to settle")
+time.sleep(2)
+print("Start sensing front")
+print("Start sensing back")
+
+#Distance helper function for ultrasound sensor
+def distance(trig, echo):
+    
+    # Create a pulse on the trigger pin
+    # This activates the sensor and tells it to send out an ultrasound signal
+    GPIO.output(trig, True)
+    time.sleep(0.00001)
+    GPIO.output(trig, False)
+
+    # Wait for a pulse to start on the echo pin
+    # The response is not valid if it takes too long, and we should break the loop
+    valid = True
+    RefTime = time.time()
+    StartTime = RefTime
+    while (GPIO.input(echo) == 0) and (StartTime-RefTime < 0.1):
+        StartTime = time.time()
+    if (StartTime-RefTime >= 0.1):
+        valid = False
+        
+    # Wait for a pulse to end on the echo pin
+    # The response is not valid if it takes too long, and we should break the loop
+    if (valid):
+        RefTime = time.time()
+        StopTime = time.time()
+        while (GPIO.input(echo) == 1) and (StopTime-RefTime < 0.1):
+            StopTime = time.time()
+        if (StopTime-RefTime >= 0.1):
+            valid = False
+        
+    # If we received a complete pulse on the echo pin (i.e., valid == True)
+    # Calculate the distance based on the length of the echo pulse and
+    # the speed of sound (34300 cm/s)
+    if (valid):
+        EchoPulseLength = StopTime - StartTime
+        return (EchoPulseLength * 34300) / 2        # Divide by 2 because we are calculating based on a reflection, so the travel time there and back
+    else:
+        return 9999999
+    
+def set_duty_cycle(angle):
+    return ((duty_max - duty_min) * float(angle) / 180.0 + duty_min)
+
+
+# Keep track of the timing
+FSM1LastTime = 0
+        
 
 # Create a data structure to store a frame
 rawframe = picamera.array.PiRGBArray(camera, size=(640, 480))
@@ -62,6 +141,19 @@ rawframe = picamera.array.PiRGBArray(camera, size=(640, 480))
 try:
 
         for frame in camera.capture_continuous(rawframe, format = 'bgr', use_video_port = True):
+            
+            # Check the current time
+            currentTime = time.time()
+            
+            #Check distance from walls using sensor
+            if (currentTime - FSM1LastTime > 1):
+                
+                distfront = distance(TriggerFront, EchoFront)
+                print("Measured Distance Front = {0} cm".format(distfront))
+                
+                distback = distance(TriggerBack, EchoBack)
+                print("Measured Distance Back = {0} cm".format(distback))
+                
             
             
             # Create a numpy array representing the image
@@ -84,6 +176,7 @@ try:
             FSM1State = FSM1NextState
             
             # Process the gamepad events
+            newbutton = False
             newstick  = False
             try:
                 for event in gamepad.read():            # Use this option (and comment out the next line) to react to the latest event only
@@ -93,6 +186,10 @@ try:
                         newstick = True
                         codestick  = eventinfo.event.code
                         valuestick = eventinfo.event.value
+                    elif event.type == 1:
+                        newbutton = True
+                        codebutton  = eventinfo.scancode
+                        valuebutton = eventinfo.keystate
             except:
                 pass
             
@@ -121,11 +218,15 @@ try:
                     print ("Change to S4: BACK")
                     FSM1NextState = 4              
                     print ("")
+                elif (newbutton and codebutton == 307 and valuebutton == 1):
+                    print ("Change to S5: Servo")
+                    FSM1NextState = 5
+                    print ("")
                 else:
                     FSM1NextState = 3
                     
             elif (FSM1State == 0):  #State 0 -> FWD, can keep going forward or go to state 3
-                if (valuestick != 0):
+                if (valuestick != 0 or distfront < 20):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -136,14 +237,14 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(50)                # duty cycle between 0 and 100
-                    pwmB.ChangeDutyCycle(50)                # duty cycle between 0 and 100
+                    pwmA.ChangeDutyCycle(75)                # duty cycle between 0 and 100
+                    pwmB.ChangeDutyCycle(75)                # duty cycle between 0 and 100
                     
                     FSM1NextState = 0              
                     print ("")
                     
             elif (FSM1State == 1):  #State 1 -> Left, can keep going left or go to state 3
-                if (valuestick != 0):
+                if (valuestick != 0 or distfront < 20):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -154,14 +255,14 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(25)               # A(BLUE/BLACK), left,  is slower
-                    pwmB.ChangeDutyCycle(50)               # B(RED/PURPLE), right, is faster
+                    pwmA.ChangeDutyCycle(50)               # A(BLUE/BLACK), left,  is slower
+                    pwmB.ChangeDutyCycle(75)               # B(RED/PURPLE), right, is faster
                     
                     FSM1NextState = 1              
                     print ("")
 
             elif (FSM1State == 2):  #State 2 -> Right, can keep going right or go to state 3
-                if (valuestick != 255):
+                if (valuestick != 255 or distfront < 20):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -172,14 +273,14 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(50)                # A(BLUE/BLACK), left, is faster
-                    pwmB.ChangeDutyCycle(25)                # B(RED/PURPLE), right, is slower
+                    pwmA.ChangeDutyCycle(75)                # A(BLUE/BLACK), left, is faster
+                    pwmB.ChangeDutyCycle(50)                # B(RED/PURPLE), right, is slower
                     
                     FSM1NextState = 2              
                     print ("")
                     
             elif (FSM1State == 4):  #State 4 -> BACK, can keep going back or go to state 3
-                if (valuestick != 255):
+                if (valuestick != 255 or distback < 20):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -196,6 +297,29 @@ try:
                     FSM1NextState = 4              
                     print ("")
                     
+            elif (FSM1State == 5):  #State 5 -> Servo. Hard coded to open box, close box, then return to state 3
+                angle = 125
+                pwm_servo.start(set_duty_cycle(angle))
+                time.sleep(2)
+                
+                angle = 30
+                pwm_servo.ChangeDutyCycle(set_duty_cycle(angle))
+                print ("Move to open")
+                
+                servoStartTime = time.time()
+                loop = True
+                while loop:
+                    servoCurrentTime = time.time()
+            
+                    if (servoCurrentTime - servoStartTime > 5):
+                        angle = 125
+                        pwm_servo.ChangeDutyCycle(set_duty_cycle(angle))
+                        time.sleep(2)
+                        pwm_servo.stop()
+                        loop = False
+                
+                FSM1NextState = 3
+                
             # Unrecognized state
             else:
                 print("Error: unrecognized state for FSM1")

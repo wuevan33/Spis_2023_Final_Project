@@ -9,7 +9,7 @@ from evdev import InputDevice, categorize
 
 # Check if the gamepad is connected
 # You need to adjust the event number if the wrong input device is read
-gamepad = InputDevice('/dev/input/event2')
+gamepad = InputDevice('/dev/input/event0')
 print(gamepad)
 
 print("Press CTRL+C to end the program.")
