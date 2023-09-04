@@ -22,6 +22,16 @@ GPIO_Bpwm = 33
 GPIO_Servo = 22 
 
 
+# set button pins
+blueButton = 40
+greenButton = 38
+whiteButton = 36
+blackButton = 32
+GPIO.setup(blueButton, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(greenButton, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(whiteButton, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(blackButton, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
 # Set GPIO direction (IN / OUT)
 GPIO.setup(GPIO_Ain1, GPIO.OUT)
 GPIO.setup(GPIO_Ain2, GPIO.OUT)
@@ -221,6 +231,7 @@ try:
                     print ("")
                 elif (newbutton and codebutton == 307 and valuebutton == 1 and not servoOpen):
                     print ("Change to S5: Servo Open")
+                    print ("Please enter password")
                     FSM1NextState = 5
                     print ("")
                 elif (newbutton and codebutton == 304 and valuebutton == 1 and servoOpen):
@@ -308,25 +319,67 @@ try:
                 pwm_servo.start(set_duty_cycle(angle))
                 time.sleep(1)
                 
+                strpwd = ""
+                for i in range(4):
+                    value = int(random.random()*4)
+        
+                    if (value == 0):
+                        char = "1"
+                    elif (value == 1):
+                        char = "2"
+                    elif (value == 2):
+                        char = "3"
+                    elif (value == 3):
+                        char = "4"
+        
+                    strpwd += char
+                
+                finished = False
+                toggle = False
+    
+                result = ""
+                while not finished:
+                
+                    blueValue = GPIO.input(blueButton)
+                    greenValue = GPIO.input(greenButton)
+                    whiteValue = GPIO.input(whiteButton)
+                    blackValue = GPIO.input(blackButton)
+        
+                    if (not toggle and blueValue == 0):
+                        toAppend = "1"
+                        toggle = True
+                    elif (not toggle and greenValue == 0):
+                        toAppend = "2"
+                        toggle = True
+                    elif (not toggle and blackValue == 0):
+                        toAppend = "4"
+                        toggle = True
+                    elif (not toggle and whiteValue == 0):
+                        toAppend = "3"
+                        toggle = True
+        
+                    if (toggle and blueValue == 1 and greenValue == 1 and blackValue == 1 and whiteValue == 1):
+                        result += toAppend
+                        toggle = False
+            
+                    if (result == strpwd):
+                        print("Correct password")
+                        break
+                    if (len(result) == 4):
+                        print("Incorrect password, try again")
+                        result = ""
+                        
+                    if (newstick and valuestick != 0):
+                        FSM1NextState = 3
+                        break
+                    
                 
                 angle = 10
                 pwm_servo.ChangeDutyCycle(set_duty_cycle(angle))
                 servoOpen = True
                 print ("Move to open")
                 time.sleep(1)
-                '''
-                servoStartTime = time.time()
-                loop = True
-                while loop:
-                    servoCurrentTime = time.time()
-            
-                    if (servoCurrentTime - servoStartTime > 5):
-                        angle = 125
-                        pwm_servo.ChangeDutyCycle(set_duty_cycle(angle))
-                        time.sleep(2)
-                        pwm_servo.stop()
-                        loop = False
-                '''
+                
                 FSM1NextState = 3
             
             elif (FSM1State == 6):

@@ -234,8 +234,8 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(50)               # A(BLUE/BLACK), left,  is slower
-                    pwmB.ChangeDutyCycle(75)               # B(RED/PURPLE), right, is faster
+                    pwmA.ChangeDutyCycle(75)               
+                    pwmB.ChangeDutyCycle(50)               
                     
                     FSM1NextState = 1              
                     print ("")
@@ -252,8 +252,8 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(75)                # A(BLUE/BLACK), left, is faster
-                    pwmB.ChangeDutyCycle(50)                # B(RED/PURPLE), right, is slower
+                    pwmA.ChangeDutyCycle(50)                
+                    pwmB.ChangeDutyCycle(75)                
                     
                     FSM1NextState = 2              
                     print ("")
@@ -262,7 +262,6 @@ try:
                 if (valuestick != 255 or distback < 20):
                     print ("Change to S3")
                     FSM1NextState = 3
-                    
                 else:
                     print ("Keep going backward")
                     
