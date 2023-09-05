@@ -242,14 +242,14 @@ try:
                     GPIO.output(GPIO_Ain2, False)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(75)                # duty cycle between 0 and 100
-                    pwmB.ChangeDutyCycle(75)                # duty cycle between 0 and 100
+                    pwmA.ChangeDutyCycle(100)                # duty cycle between 0 and 100
+                    pwmB.ChangeDutyCycle(100)                # duty cycle between 0 and 100
                     
                     FSM1NextState = 0              
                     print ("")
                     
             elif (FSM1State == 1):  #State 1 -> Left, can keep going left or go to state 3
-                if (valuestick != 0 or distfront < 20):
+                if (valuestick != 0 or distfront < 30):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -258,34 +258,34 @@ try:
                     
                     GPIO.output(GPIO_Ain1, True)
                     GPIO.output(GPIO_Ain2, False)
-                    GPIO.output(GPIO_Bin1, True)
-                    GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(75)               
-                    pwmB.ChangeDutyCycle(50)               
+                    GPIO.output(GPIO_Bin1, False)
+                    GPIO.output(GPIO_Bin2, True)
+                    pwmA.ChangeDutyCycle(60)               
+                    pwmB.ChangeDutyCycle(60)               
                     
                     FSM1NextState = 1              
                     print ("")
 
             elif (FSM1State == 2):  #State 2 -> Right, can keep going right or go to state 3
-                if (valuestick != 255 or distfront < 20):
+                if (valuestick != 255 or distfront < 30):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
                 else:
                     print ("Keep turning right")
                     
-                    GPIO.output(GPIO_Ain1, True)
-                    GPIO.output(GPIO_Ain2, False)
+                    GPIO.output(GPIO_Ain1, False)
+                    GPIO.output(GPIO_Ain2, True)
                     GPIO.output(GPIO_Bin1, True)
                     GPIO.output(GPIO_Bin2, False)
-                    pwmA.ChangeDutyCycle(50)               
-                    pwmB.ChangeDutyCycle(75)                
+                    pwmA.ChangeDutyCycle(60)               
+                    pwmB.ChangeDutyCycle(60)                
                     
                     FSM1NextState = 2              
                     print ("")
                     
             elif (FSM1State == 4):  #State 4 -> BACK, can keep going back or go to state 3
-                if (valuestick != 255 or distback < 20):
+                if (valuestick != 255 or distback < 30):
                     print ("Change to S3")
                     FSM1NextState = 3
                     
@@ -296,8 +296,8 @@ try:
                     GPIO.output(GPIO_Ain2, True)
                     GPIO.output(GPIO_Bin1, False)
                     GPIO.output(GPIO_Bin2, True)
-                    pwmA.ChangeDutyCycle(33)                # left goes faster than right
-                    pwmB.ChangeDutyCycle(33)
+                    pwmA.ChangeDutyCycle(100)                # left goes faster than right
+                    pwmB.ChangeDutyCycle(100)
                     
                     FSM1NextState = 4              
                     print ("")
